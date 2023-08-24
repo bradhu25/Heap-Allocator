@@ -1,0 +1,18 @@
+File: readme.txt
+Author: Bradley Hu
+----------------------
+
+1. One design decision I made for my explicit allocator was the use of the header to track the status and size of a pointer alongside the linked list to search the free space. I originally considered avoiding the use of the header to track the size in order to minimize the risk of bitwise manipulation affecting the correct payload size, but noticed that this startegy was inefficient given that it would invovle traversing the free list each time to look up whether a specific block was used or free. My solution to this was the implementation of the get_block_size function, which handels the bitwise maneuvering safely by returning the header with the LSB turned off in all cases. A second design decision I made was to add all new free nodes the front of the linked list. This made for easier implementation of adding a node as well as allowing the traversal of the nodes to start with the most recently freed node.
+
+One case in which my explicit allocator would show strong performance would be in the event of many reallocs of similar or smaller size. While an implicit allocator may waste significant heap space moving similar sized pointers to new locations, my explicit allocator's in-place realloc functionality allows the resizing of the current block, preventing the waste of non-needed heap space. A case in which my allocator may fall short is the event of a large proportion of allocs to frees. If the user is mostly allocating space, the explicit allocator has a higher instruction count and consequent runttime compared to the implicit allocator with marginal utilization improvement. 
+
+One way in which I optimized my allocator was with the implementation of coalescing blocks upon free and realloc. With this implementation, my explicit will combine two adjacent free block upon a free, allowing for an allocation of greater size in the larger unified heap space versus two smaller blocks which may have gone to waste otherwise. In addition, the calls to coalesce in realloc allow for the in-place realloc feature, enabling the block to resize by combining adjacent free blocks to fit the reallocation request while possible.
+
+2. One assumption made by my explicit allocator is that the user provides a size request that is within the maximum heap size. If the user made a request that exceeded the heap size, the heap memory would become corrupted without error handling. For this reason, I have instructed my allocator to return NULL in such cases, preventing catastrophic memory corruption. Another assumption made by my allocator is that user frees only memory that already exists. In the case where the user attempts to free a portion of memory that does not exist on the heap, the allocator will do nothing. 
+
+
+Tell us about your quarter in CS107!
+-----------------------------------
+I really loved this class! While definitely challenging, I feel like I inherited and retained the most knowledge from taking this online course in my college experience thus far. I genuinely feel that I have come a very long way as a programmer from when I started taking this course, and feel that the class has solidified my intentions of pursuing the CS major. I thought that the class was structured well, with the segmented lectures making learning the material much more manageable. The assignments took up a lot of my time, but were worth every minute due to how much I could feel I had grown as a programmer from the beginning to end of each one. Finally, the teaching team and staff are all incredibly supprotive and I want to say thank you all for your speedy responses on ed and patience in helper hours :)
+
+

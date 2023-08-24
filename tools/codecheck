@@ -1,0 +1,166 @@
+#!/usr/bin/python2
+
+"""
+Cem Gokmen, Nick Troccoli
+
+Code check runs cpplint and clang-tidy on code files and outputs code
+issues, if any.  Checks are designed to match course guidelines and style guide,
+but are not exhaustive.
+"""
+
+import glob
+import json
+import subprocess
+import sys
+
+CPPLINT_EXECUTABLE = "/afs/ir/class/cs107/tools/cpplint"
+CPPLINT_LINE_LENGTH = 120
+CPPLINT_DISABLED_CHECKS = [
+	"legal/copyright",
+	"runtime/int",
+	"runtime/printf",
+	"readability/casting",
+	"whitespace/end_of_line",
+	"runtime/arrays"
+]
+
+CLANG_TIDY_EXECUTABLE = "clang-tidy"
+CLANG_TIDY_ENABLED_CHECKS = [
+	"bugprone-assert-side-effect",
+	"bugprone-bool-pointer-implicit-conversion",
+	"bugprone-branch-clone",
+	"bugprone-macro-parentheses",
+	"bugprone-macro-repeated-side-effects",
+	"bugprone-misplaced-operator-in-strlen-in-alloc",
+	"bugprone-misplaced-pointer-arithmetic-in-alloc",
+	"bugprone-misplaced-widening-cast",
+	"bugprone-multiple-statement-macro",
+	"bugprone-not-null-terminated-result",
+	"bugprone-redundant-branch-condition",
+	"bugprone-sizeof-expression",
+	"bugprone-string-literal-with-embedded-nul",
+	"bugprone-suspicious-include",
+	"bugprone-suspicious-memset-usage",
+	"bugprone-suspicious-missing-comma",
+	"bugprone-suspicious-semicolon",
+	"bugprone-suspicious-string-compare",
+	"bugprone-swapped-arguments",
+	"bugprone-too-small-loop-variable",
+	"cppcoreguidelines-avoid-goto",
+	"cppcoreguidelines-init-variables",
+	"hicpp-multiway-paths-covered",
+	"misc-definitions-in-headers",
+	"misc-misplaced-const",
+	"misc-redundant-expression",
+	"misc-unused-parameters",
+	"modernize-use-bool-literals",
+	"performance-no-int-to-ptr",
+	"readability-avoid-const-params-in-decls",
+	"readability-braces-around-statements",
+	"readability-const-return-type",
+	"readability-else-after-return",
+	"readability-function-size",
+	#"readability-identifier-naming" - TODO; concern about consistent naming inconsistent with starter
+	#"readability-implicit-bool-conversion" - TODO; is if (!x) ok?
+	"readability-inconsistent-declaration-parameter-name",
+	"readability-isolate-declaration",
+	"readability-magic-numbers",
+	"readability-misleading-indentation",
+	"readability-misplaced-array-index",
+	"readability-named-parameter",
+	"readability-redundant-control-flow",
+	"readability-redundant-declaration",
+	"readability-redundant-function-ptr-dereference",
+	"readability-simplify-boolean-expr",
+	"readability-uppercase-literal-suffix",
+]
+CLANG_TIDY_ENABLED_CHECK_OPTIONS = {
+	"bugprone-not-null-terminated-result.WantToUseSafeFunctions": False,
+	"bugprone-sizeof-expression.WarnOnSizeOfIntegerExpression": True,
+	"readability-function-size.LineThreshold": 50,
+	"readability-function-size.ParameterThreshold": 8,
+	"readability-function-size.StatementThreshold": -1
+}
+
+CLANG_TIDY_CONFIG = {
+	"Checks": "-*," + ",".join(CLANG_TIDY_ENABLED_CHECKS),
+	"CheckOptions": [{"key": k, "value": v} for k, v in CLANG_TIDY_ENABLED_CHECK_OPTIONS.iteritems()],
+	"WarningsAsErrors": "*"
+}
+
+# By default, run on all .c files in current directory
+DEFAULT_FILES_TO_CHECK = glob.glob("*.c")
+
+
+def print_intro():
+	'''
+	Prints out a message introducing the program and what it does.
+	'''
+	print("Running code check.  This check is NOT exhaustive;")
+	print("it is only meant to identify common code and style issues.")
+	print("It is currently in beta - if you have concerns about results please ask on Ed.")
+	print("Check the course style guide and assignment spec for more coding guidelines.")
+	print("----\n")
+
+def run_command(command):
+	'''
+	Runs the given command array, and returns (stdout, stderr, success)
+	tuple, where success is True if the returncode is 0, and False otherwise.
+	'''
+	subprocess_call = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+	cmd_stdout, cmd_stderr = subprocess_call.communicate()
+	return (cmd_stdout, cmd_stderr, subprocess_call.returncode == 0)
+
+def run_cpplint(files_to_check):
+	'''
+	Runs cpplint with the configuration constants on the given files.
+	'''
+	cpplint_command = [
+		CPPLINT_EXECUTABLE,
+		"--filter=+," + ",".join(["-%s" % check for check in CPPLINT_DISABLED_CHECKS]),
+		"--linelength=%d" % CPPLINT_LINE_LENGTH
+	] + files_to_check
+
+	return run_command(cpplint_command)
+
+def run_clang_tidy(files_to_check):
+	'''
+	Runs clang-tidy with the configuration constants on the given files.
+	'''
+	clang_tidy_command = [
+		CLANG_TIDY_EXECUTABLE,
+		"--config=" + json.dumps(CLANG_TIDY_CONFIG),
+	] + files_to_check + ["--"]
+
+	return run_command(clang_tidy_command)
+
+def main():
+	print_intro()
+
+	# Figure out which files to run on
+	files_to_check = DEFAULT_FILES_TO_CHECK
+	if len(sys.argv[1:]) == 0:
+		print("No files specified, running on all .c files in current directory.")
+	else:
+		files_to_check = sys.argv[1:]
+		print("Running on file(s) %s" % files_to_check)
+
+	# Run cpplint and clang-tidy
+	_, cpplint_stderr, cpplint_success = run_cpplint(files_to_check)
+	clang_tidy_stdout, _, clang_tidy_success = run_clang_tidy(files_to_check)
+
+	# Output results
+	if cpplint_success and clang_tidy_success:
+		print("No style issues found.")
+	else:
+		print("One or more style issues found:\n")
+
+		if not cpplint_success:
+			print("Issues found by cpplint:\n" + cpplint_stderr)
+
+		if not clang_tidy_success:
+			print("Issues found by clang-tidy:\n" + clang_tidy_stdout)
+
+
+if __name__ == "__main__":
+	main()
